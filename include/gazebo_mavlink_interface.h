@@ -86,7 +86,10 @@ class GazeboMavlinkInterface : public ModelPlugin {
         hil_sensor_mavlink_pub_topic_(kDefaultMavlinkHilSensorPubTopic),
         hil_gps_mavlink_pub_topic_(kDefaultMavlinkHilGpsPubTopic),
         imu_sub_topic_(kDefaultImuTopic),
-        mavlink_control_sub_topic_(kDefaultMavlinkControlSubTopic) {}
+        mavlink_control_sub_topic_(kDefaultMavlinkControlSubTopic),
+        lat_rad(0.0),
+        lon_rad(0.0)
+        {}
   ~GazeboMavlinkInterface();
 
   void Publish();
@@ -145,6 +148,8 @@ class GazeboMavlinkInterface : public ModelPlugin {
   common::Time last_time_;
   common::Time last_gps_time_;
   double gps_update_interval_;
+  double lat_rad;
+  double lon_rad;
 
   math::Vector3 gravity_W_;
   math::Vector3 velocity_prev_W_;
