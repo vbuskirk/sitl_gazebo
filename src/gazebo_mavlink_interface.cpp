@@ -122,6 +122,17 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
     return;
   }
 
+  memset((char *)&_myaddr, 0, sizeof(_myaddr));
+  _myaddr.sin_family = AF_INET;
+  _myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // Let the OS pick the port
+  _myaddr.sin_port = htons(0);
+
+  if (bind(_fd, (struct sockaddr *)&_myaddr, sizeof(_myaddr)) < 0) {
+    printf("bind failed\n");
+    return;
+  }
+
   _srcaddr.sin_family = AF_INET;
   _srcaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   _srcaddr.sin_port = htons(UDP_PORT);
@@ -132,8 +143,6 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
 
   _addrlen = sizeof(_srcaddr);
 
-  _addrlen_2 = sizeof(_srcaddr_2);
-
   fds[0].fd = _fd;
   fds[0].events = POLLIN;
 }
@@ -143,22 +152,22 @@ void GazeboMavlinkInterface::OnUpdate(const common::UpdateInfo& /*_info*/) {
 
   pollForMAVLinkMessages();
 
-  if(!received_first_referenc_)
-    return;
-
   common::Time now = world_->GetSimTime();
 
-  mav_msgs::msgs::CommandMotorSpeed turning_velocities_msg;
+  if(received_first_referenc_) {
+
+    mav_msgs::msgs::CommandMotorSpeed turning_velocities_msg;
 
 
-  for (int i = 0; i < input_reference_.size(); i++){
-    turning_velocities_msg.add_motor_speed(input_reference_[i]);
+    for (int i = 0; i < input_reference_.size(); i++){
+      turning_velocities_msg.add_motor_speed(input_reference_[i]);
+    }
+    // TODO Add timestamp and Header
+    // turning_velocities_msg->header.stamp.sec = now.sec;
+    // turning_velocities_msg->header.stamp.nsec = now.nsec;
+
+    motor_velocity_reference_pub_->Publish(turning_velocities_msg);
   }
-  // TODO Add timestamp and Header
-  // turning_velocities_msg->header.stamp.sec = now.sec;
-  // turning_velocities_msg->header.stamp.nsec = now.nsec;
-
-  motor_velocity_reference_pub_->Publish(turning_velocities_msg);
 
   //send gps
   common::Time current_time  = now;
@@ -341,7 +350,7 @@ void GazeboMavlinkInterface::ImuCallback(ImuPtr& imu_message) {
     sensor_msg.ymag = mag_I.y + mag_noise;
     sensor_msg.zmag = mag_I.z + mag_noise;
     sensor_msg.abs_pressure = 0.0;
-    sensor_msg.diff_pressure = 0.5*1.2754*body_vel.x*body_vel.x;
+    sensor_msg.diff_pressure = 0.5*1.2754*(body_vel.z + body_vel.x)*(body_vel.z + body_vel.x) / 100;
     sensor_msg.pressure_alt = pos_W_I.z;
     sensor_msg.temperature = 0.0;
     sensor_msg.fields_updated = 4095;
@@ -421,7 +430,7 @@ void GazeboMavlinkInterface::pollForMAVLinkMessages()
     if (len > 0) {
       mavlink_message_t msg;
       mavlink_status_t status;
-      for (int i = 0; i < len; ++i)
+      for (unsigned i = 0; i < len; ++i)
       {
         if (mavlink_parse_char(MAVLINK_COMM_0, _buf[i], &msg, &status))
         {
@@ -454,7 +463,9 @@ void GazeboMavlinkInterface::handle_message(mavlink_message_t *msg)
 
     // simple check to see if we are simulating fw or mc
     // we really need to get away from this HIL message
-    bool is_fixed_wing = inputs.control[0] < 10.0f;
+    //bool is_fixed_wing = inputs.control[0] < 10.0f;
+    // TODO XXX: this makes SITL work again
+    bool is_fixed_wing = false;
 
     input_reference_.resize(_rotor_count);
 
