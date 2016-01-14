@@ -21,7 +21,7 @@
 
 #include "gazebo_mavlink_interface.h"
 
-#define UDP_PORT 14560
+#define UDP_PORT 14520
 #define UDP_PORT_2 14556
 
 namespace gazebo {
